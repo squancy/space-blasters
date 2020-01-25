@@ -47,6 +47,7 @@ try:
 except OSError:
   hsFile = open('hs.txt', 'w')
   hsFile.write('-1')
+  hsFile.close()
 
 def updateHSFile(newHS):
   f = open('hs.txt', 'w')
