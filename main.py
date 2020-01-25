@@ -2,6 +2,7 @@ import kivy
 kivy.require('1.11.0')
 
 from kivy.config import Config
+
 # make sure that the program does not exit on ESC; it is used later
 Config.set('kivy', 'exit_on_escape', '0')
 
@@ -159,18 +160,20 @@ def increasePoint(enemy):
 
 # check for game over
 def showGameOver(self):
+  GlobalContainer.anc.isDuringGO = True
   self.add_widget(Image(source='images/game_over.png',
     size=(200, 200),
     pos=(Window.width / 2 - 100, Window.height / 2 - 100)))
-  Clock.schedule_once(lambda x: playAgain(), 3)
+  Clock.schedule_once(lambda x: playAgain(True), 3)
 
-def playAgain():
+def playAgain(fromGO = False):
   initReset(GlobalContainer)
   SpaceApp.bgMusic.stop()
   SpaceApp.bgMusic.unload()
   app.stop()
   reset()
   app.run()
+  if fromGO: GlobalContainer.anc.isDuringGO = False
 
 # initialize global attributes
 def initReset(obj):
@@ -563,9 +566,12 @@ class MainLayout(Widget, GlobalContainer):
       source='images/spacebg.png')  
     self.about = Rectangle(source='images/about.png',
       size=(Window.width / 3, Window.height / 3),
-      pos=(Window.width / 2 - 120, Window.height))
+      pos=(self.x + Window.width / 2, Window.height))
     self.toggle = True
     self.next = 0
+
+    # do not allow ESC press during Game Over screen
+    self.isDuringGO = False
     GlobalContainer.anc = self
     sched_append(lambda x: self.add_widget(RandomDrop(self)), 7)
 
@@ -585,7 +591,7 @@ class MainLayout(Widget, GlobalContainer):
     
   # when ESC is pressed freeze everything and display 'about' page
   def fire_keyboard(self, keyboard, keycode, text, modifiers):
-    if keycode[0] == 27: startAgain(self)
+    if keycode[0] == 27 and not self.isDuringGO: startAgain(self)
               
   def moveAbout(self, y):
     self.about.pos = Window.width / 2 - 120, y - 1
