@@ -1,6 +1,7 @@
-from kivy.config import Config
 import kivy
-require('1.11.1')
+kivy.require('1.11.0')
+
+from kivy.config import Config
 # make sure that the program does not exit on ESC; it is used later
 Config.set('kivy', 'exit_on_escape', '0')
 
