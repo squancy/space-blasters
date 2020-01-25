@@ -31,3 +31,11 @@ git clone https://github.com/squancy/space-blasters
 python3 main.py
 ```
 
+### Nice todos
+  - add more ships, bosses and levels
+  - let the player select their own ships & also customize them
+  - online battles
+  - anything else you think would be great...
+  
+If you have any questions feel free to drop me with an email at <a href='mailto:mark@pearscom.com'>mark@pearscom.com</a>.
+
