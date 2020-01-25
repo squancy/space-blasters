@@ -7,6 +7,8 @@ The player needs to shoot the incoming enemy ships achieving an ever-increasing 
 
 There are also randomly appearing drops that help the player to survive.
 
+![alt text](https://github.com/squancy/space-blasters/images/showcase.png)
+
 ### Usage
 First, install <a href='https://www.kivy.org'>Kivy</a>:
 
