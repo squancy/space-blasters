@@ -1,0 +1,46 @@
+#:import Window kivy.core.window.Window
+<MainLayout>: 
+  ActionBar:
+    width: root.width
+    height: 40
+    pos: 0, root.height - self.height
+    background_normal: ''
+    background_down: ''
+    background_color: (0.142, 0.142, 0.142, 1)
+    ActionView:
+      ActionPrevious:
+        app_icon: 'logo.png'
+        app_icon_height: 50
+        app_icon_width: 50
+        with_previous: False
+
+      ActionOverflow:
+        overflow_image: 'images/menu.png' 
+
+  Label:
+    text: 'Space Blasters'
+    font_name: 'fonts/classic.ttf'
+    font_size: 20
+    pos: 100, Window.height - 70 
+    color: 1, 0.73, 0, 1
+
+<SpaceshipInit>:
+  health: self.health
+  score: self.score
+  highScore: self.highScore
+  Label:
+    text: str(root.health) + ' hp'
+    font_size: 20
+    font_name: 'fonts/classic.ttf'
+    color: 1, 0, 0, 1
+    pos: Window.width - 90, Window.height - 70
+
+  Label:
+    text: str(root.score) + ' p'
+    font_size: 20
+    font_name: 'fonts/classic.ttf'
+    color: 1, 0.73, 0, 1
+    pos: Window.width - 170, Window.height - 70
+
+  
+  
