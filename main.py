@@ -53,6 +53,7 @@ except OSError:
 def updateHSFile(newHS):
   f = open('hs.txt', 'w')
   f.write(str(newHS))
+  f.close()
 
 def checkSound(sound): sound.play()
 
