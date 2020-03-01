@@ -37,5 +37,8 @@ python3 main.py
   - online battles
   - anything else you think would be great...
   
+### Get APK
+You can download Space Blasters to any Android compatible device: <a href='https://www.pearscom.com/sb.php'>download</a>.
+  
 If you have any questions feel free to drop me with an email at <a href='mailto:mark@pearscom.com'>mark@pearscom.com</a>.
 
