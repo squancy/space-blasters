@@ -24,20 +24,11 @@ from kivy.uix.actionbar import ActionBar
 from kivy.core.window import Window
 from kivy.clock import Clock
 from kivy.core.audio import SoundLoader
+from kivy.lang import Builder
 import time, random
 
 getTime = lambda: int(round(time.time() * 1000))
 gameStartTime = getTime()
-
-# fix ERROR: no event listeners have been created ... issue
-def reset():
-  from kivy.base import EventLoop
-  if not EventLoop.event_listeners:
-    from kivy.cache import Cache
-    Window.Window = window.core_select_lib('window', Window.window_impl, True)
-    Cache.print_usage()
-    for cat in Cache._categories:
-      Cache._objects[cat] = {}
 
 # do not show cursor
 Window.show_cursor = False
@@ -88,17 +79,16 @@ def removeHandlers():
   Window.unbind(mouse_pos=GlobalContainer.all_binders[0])
 
 # show about when logo is clicked; support mobile devices
-def clickAbout(p):
+def clickAbout(p, self):
   if p.pos[0] <= 65 and p.pos[1] >= Window.height - 40 and clickAbout.state:
     startAgain(GlobalContainer.anc)
     clickAbout.state = False
   elif not clickAbout.state:
-    playAgain()
+    playAgain(self)
     GlobalContainer.anc.toggle = True
     clickAbout.state = True
 
 clickAbout.state = True
-Window.bind(on_touch_down=lambda x, p: clickAbout(p))
 
 def decreaseHealth(n):
   if not GlobalContainer.playerShip.hasShield:
@@ -123,21 +113,27 @@ def laserHitsSprite(self, parent, isCrash = False):
     playSound('sounds/game_over.mp3', 0.5)
     showGameOver(GlobalContainer.anc)
 
+# check if any two sprites collide on the screen
+# sprites are transparent, rectengular png images that act as a hitbox
+# therefore it might be imprecise but not too noticable
+def spritesCollided(x1, y1, width1, height1, x2, y2, width2, height2):
+  return (x1 < x2 + width2 and x1 + width1 > x2 and y1 < y2 + height2 and y1 + height1 > y2)
+
 # go back to a new game after leaving the 'about' page
 def startAgain(self):
   if self.toggle:
     removeHandlers()
+    removeWidgets(self)
     GlobalContainer.all_handlers = []
     self.nowAbout = True
-    self.canvas.clear()
-    self.canvas.add(self.rect)
-    self.canvas.add(self.about)
+    self.canvas.before.add(self.rect)
+    self.canvas.before.add(self.about)
     self.about_handler = lambda x: self.moveAbout(self.about.pos[1])
     sched_append(self.about_handler)
     clickAbout.state = False
     self.toggle = False
   else:
-    playAgain()
+    playAgain(self)
     self.toggle = True
     clickAbout.state = True
 
@@ -162,18 +158,35 @@ def increasePoint(enemy):
 # check for game over
 def showGameOver(self):
   GlobalContainer.anc.isDuringGO = True
-  self.add_widget(Image(source='images/game_over.png',
-    size=(200, 200),
-    pos=(Window.width / 2 - 100, Window.height / 2 - 100)))
-  Clock.schedule_once(lambda x: playAgain(True), 3)
+  gameOverText = Image(source='images/game_over.png', size=(200, 200),
+    pos=(Window.width / 2 - 100, Window.height / 2 - 100))
+  self.add_widget(gameOverText)
+  GlobalContainer.sprites.append(gameOverText)
+  Clock.schedule_once(lambda x: playAgain(self, True), 3)
 
-def playAgain(fromGO = False):
-  initReset(GlobalContainer)
+# manually remove the widgets (except the header) from the screen when restarting the game
+def removeWidgets(self):
+  for enemy in GlobalContainer.enemies:
+    self.remove_widget(enemy)
+
+  for sprite in GlobalContainer.sprites:
+    self.remove_widget(sprite)
+
+  self.remove_widget(GlobalContainer.playerShip)
+
+# reset game state and start a new game
+def playAgain(self, fromGO = False):
+  # if sound works fine then uncomment the following 2 lines with code
+  # if kivy gives a warning about ffmpeg or does not play sounds then it leave it as it is
+  # because it breaks the program
+  """
   SpaceApp.bgMusic.stop()
   SpaceApp.bgMusic.unload()
-  app.stop()
-  reset()
-  app.run()
+  """
+  removeHandlers()
+  GlobalContainer.all_handlers = []
+  removeWidgets(self)
+  initGame(self)
   if fromGO: GlobalContainer.anc.isDuringGO = False
 
 # initialize global attributes
@@ -185,6 +198,7 @@ def initReset(obj):
   obj.hsShown = False
   obj.all_handlers = []
   obj.all_binders = []
+  obj.sprites = []
 
 # class containing data that is needed globally
 class GlobalContainer: pass
@@ -222,10 +236,11 @@ class Laser(Image, GlobalContainer):
   def __init__(self, p, parent, **kwargs):
     Image.__init__(self, **kwargs)
     self.source = 'images/laser.png'
-    self.size = 70, 40
-    self.pos = p.pos[0] - 30, p.pos[1] + 52
+    self.size = 60, 30
+    self.pos = p.pos[0] - 25, p.pos[1] + 52
     self.handler = lambda x: self.updateLaserPos(p, parent)
     sched_append(self.handler)
+    GlobalContainer.sprites.append(self)
     
   # when enemy ship is killed show blast gif & do a cleanup
   def killEnemy(self, enemy, parent):
@@ -238,7 +253,8 @@ class Laser(Image, GlobalContainer):
   # check if laser hit an enemy
   def laserHitsEnemy(self, p, parent):
     for enemy in self.enemies:
-      if (self.top >= (enemy.top - enemy.height) and abs(self.right - enemy.right) <= 33):
+      if spritesCollided(self.pos[0], self.pos[1], self.width, self.height, enemy.pos[0],
+        enemy.pos[1], enemy.width, enemy.height):
         unsched_rem(self.handler) 
         unsched_rem(enemy.elaser_handler)
         parent.remove_widget(self)
@@ -269,7 +285,7 @@ class Laser(Image, GlobalContainer):
     # update laser pos
     p.pos = list(p.pos)
     p.pos[1] += 5
-    self.pos = p.pos[0] - 30, p.pos[1] + 52 
+    self.pos = p.pos[0] - 25, p.pos[1] + 52 
 
   def shootLaser(self, p):
     playSound('sounds/laser.mp3', 0.1)
@@ -282,6 +298,8 @@ class SpaceshipInit(Image, GlobalContainer):
     self.source = 'images/spaceship.png'
     self.health = 100
     self.score = 0
+    self.width = min(Window.width / 7, 70);
+    self.height = self.width;
     self.hasShield = False
     self.hasSpeedo = False
     self.highScore = int(open('hs.txt').read())
@@ -295,15 +313,16 @@ class SpaceshipInit(Image, GlobalContainer):
   # create new Laser instance
   def laserHandler(self, w):
     class obj: pass
-    obj.pos = self.pos[0] + 45, self.pos[1] + 50
+    obj.pos = self.pos[0] + 30, self.pos[1] + 30
     Laser.shootLaser(self, obj)
  
   # update spaceship pos as the cursor is moving
+  # also make sure that the spaceship cannot go out of the map (screen)
   def updateSpaceshipPos(self, p, parent):
     x_pos = p[0] - 45
     y_pos = p[1] - 45
-    if p[0] + 55 >= Window.width:
-      x_pos = Window.width - 100
+    if p[0] + 27 >= Window.width:
+      x_pos = Window.width - 73
     elif p[0] <= 48:
       x_pos = 3
     if p[1] <= 43:
@@ -322,11 +341,12 @@ class EnemyLaser(Image, GlobalContainer):
     # 3 types of lasers: straight, diagonally left, diagonally right
     self.source = ['images/enemy_laser.png', 'images/el_pdeg45.png', 
                     'images/el_ndeg45.png'][etype]
-    if etype == 0: self.width = 10
-    else: self.width = 20
+    if etype == 0: self.width = 8
+    else: self.width = 16
     self.pos = pos[0], pos[1]
     self.handler = lambda x: self.updatePos(parent, etype)
     sched_append(self.handler)
+    GlobalContainer.sprites.append(self)
 
   # update laser pos in regard of their types
   def updatePos(self, parent, etype):
@@ -342,8 +362,9 @@ class EnemyLaser(Image, GlobalContainer):
       unsched_rem(self.handler)
 
     # check if collides with player's ship
-    if (self.pos[0] - 100 < self.playerShip.pos[0] < self.pos[0] + 20
-      and self.pos[1] - 70 < self.playerShip.pos[1] < self.pos[1] + 60):
+    ship = self.playerShip
+    if (spritesCollided(self.pos[0], self.pos[1], self.width, self.height, ship.pos[0],
+      ship.pos[1], ship.width, ship.height)):
       laserHitsSprite(self, parent)
 
 # 3 bonuses to help the player
@@ -361,13 +382,15 @@ class RandomDrop(Image, GlobalContainer):
     sched_append(self.handler)
     self.width = 20
     self.y_vel = random.randint(15, 20) / 10
+    GlobalContainer.sprites.append(self)
 
   # if player's ship picks the bonus up take action
   def moveDrop(self, parent):
     self.pos = self.pos[0], self.pos[1] - self.y_vel
+    ship = self.playerShip
     if self.pos[1] < 0: parent.remove_widget(self)
-    if (self.pos[0] - 100 < self.playerShip.pos[0] < self.pos[0] + 20
-      and self.pos[1] - 70 < self.playerShip.pos[1] < self.pos[1] + 60):
+    if (spritesCollided(self.pos[0], self.pos[1], self.width, self.height, ship.pos[0],
+      ship.pos[1], ship.width, ship.height)):
       parent.remove_widget(self)
       if self.type == 0: self.handleHealth(parent)
       elif self.type == 1: self.handleShield(parent)
@@ -438,9 +461,9 @@ class EnemyInit(Image, GlobalContainer):
     Image.__init__(self, **kwargs)
 
     # choose randomly from 3 types of enemies with 1, 2 and 3 hp, respectively
-    enemyImages = ['enemy1.png', 'enemy2.png', 'enemy3.png']
+    enemyImages = ['enemy1', 'enemy2', 'enemy3']
     randEnemyType = random.randint(0, 2)
-    self.source = 'images/' + enemyImages[randEnemyType]
+    self.source = 'images/' + enemyImages[randEnemyType] + '.png'
     self.type = randEnemyType
     self.life = self.type + 1
 
@@ -448,8 +471,8 @@ class EnemyInit(Image, GlobalContainer):
     x_coord = random.randint(50, Window.width - 50)
     y_coord = Window.height - 90
     self.pos = x_coord, y_coord
-    self.width = 55
-    self.height = 55
+    self.width = min(Window.width / 10, 40);
+    self.height = self.width;
     self.x_vel = 1.5
     self.y_vel = 1.5
 
@@ -483,7 +506,7 @@ class EnemyInit(Image, GlobalContainer):
 
   def shootEnemyLaser(self, parent):
     # create different laser shooting implementations for different enemy ships
-    current_pos = self.pos[0] + 23, self.pos[1] - 60
+    current_pos = self.pos[0] + 13, self.pos[1] - 60
     if self.type == 0:
       parent.add_widget(EnemyLaser(parent, current_pos, 0))
     elif self.type == 1:
@@ -533,48 +556,54 @@ class EnemyInit(Image, GlobalContainer):
       return True
     return False
 
+def initGame(self):
+  # two images for the effect of a 'moving background'
+  self.spacebg = Rectangle(pos=(0, 0),
+    size=(Window.width, Window.height), source='images/spacebg.png')
+  self.spacebg2 = Rectangle(pos=(0, Window.height),
+    size=(Window.width, Window.height), source='images/spacebg.png')
+  self.canvas.before.add(self.spacebg)
+  self.canvas.before.add(self.spacebg2)
+  self.twoBgs = [self.spacebg, self.spacebg2]
+  sched_append(lambda x: self.updateBg())
+
+  # initialize player's ship and enemies
+  self.add_widget(SpaceshipInit(self))
+  startEnemy = EnemyInit(self)
+  self.add_widget(startEnemy)
+  self.enemies.append(startEnemy)
+  self.handler = lambda x: self.addEnemy()
+  sched_append(self.handler, 2)
+  self.changeInt = lambda x: changeEnemyInterval(self, self.handler, 1)
+  Clock.schedule_once(self.changeInt, 3)
+
+  # when ESC is pressed show 'about' page
+  self.keyboard = Window.request_keyboard(self.close_keyboard, self)
+  self.keyboard.bind(on_key_down=self.fire_keyboard)
+  self.nowAbout = False
+  
+  self.rect = Rectangle(pos=(0, 0), size=(Window.width, Window.height),
+    source='images/spacebg.png')  
+  self.about = Rectangle(source='images/about.png',
+    size=(Window.width / 3, Window.height / 3),
+    pos=(self.x + Window.width / 2, Window.height))
+  self.toggle = True
+  self.next = 0
+
+  sched_append(lambda x: print(GlobalContainer.anc.children), 1)
+
+  # do not allow ESC press during Game Over screen
+  self.isDuringGO = False
+  GlobalContainer.anc = self
+  sched_append(lambda x: self.add_widget(RandomDrop(self)), 7)
+  Window.bind(on_touch_down=lambda x, p: clickAbout(p, self))
+
 # initialize spaceship, enemies etc.
 class MainLayout(Widget, GlobalContainer):
   def __init__(self, **kwargs):
     Widget.__init__(self, **kwargs)
-
-    # two images for the effect of a 'moving background'
-    self.spacebg = Rectangle(pos=(0, 0),
-      size=(Window.width, Window.height), source='images/spacebg.png')
-    self.spacebg2 = Rectangle(pos=(0, Window.height),
-      size=(Window.width, Window.height), source='images/spacebg.png')
-    self.canvas.before.add(self.spacebg)
-    self.canvas.before.add(self.spacebg2)
-    self.twoBgs = [self.spacebg, self.spacebg2]
-    sched_append(lambda x: self.updateBg())
-
-    # initialize player's ship and enemies
-    self.add_widget(SpaceshipInit(self))
-    startEnemy = EnemyInit(self)
-    self.add_widget(startEnemy)
-
-    # when ESC is pressed show 'about' page
-    self.keyboard = Window.request_keyboard(self.close_keyboard, self)
-    self.keyboard.bind(on_key_down=self.fire_keyboard)
-    self.enemies.append(startEnemy)
-    self.handler = lambda x: self.addEnemy()
-    sched_append(self.handler, 2)
-    self.changeInt = lambda x: changeEnemyInterval(self, self.handler, 1)
-    self.nowAbout = False
-    Clock.schedule_once(self.changeInt, 3)
     
-    self.rect = Rectangle(pos=(0, 0), size=(Window.width, Window.height),
-      source='images/spacebg.png')  
-    self.about = Rectangle(source='images/about.png',
-      size=(Window.width / 3, Window.height / 3),
-      pos=(self.x + Window.width / 2, Window.height))
-    self.toggle = True
-    self.next = 0
-
-    # do not allow ESC press during Game Over screen
-    self.isDuringGO = False
-    GlobalContainer.anc = self
-    sched_append(lambda x: self.add_widget(RandomDrop(self)), 7)
+    initGame(self)
 
   # implement a moving background with two images getting constantly above of each other
   def updateBg(self):
@@ -606,6 +635,7 @@ class MainLayout(Widget, GlobalContainer):
       pos=(Window.width / 2 - 120, Window.height / 2 - 120),
       size=(Window.width / 3, Window.height / 3))
     self.add_widget(self.pressImg)
+    GlobalContainer.sprites.append(self.pressImg)
     self.pressHandler = lambda x: self.showHide(self.pressImg)
     sched_append(self.pressHandler, 1)
 
