@@ -32,6 +32,7 @@ gameStartTime = getTime()
 
 # do not show cursor
 Window.show_cursor = False
+Window.size = (900, 600)
 
 # high score is stored in a file permanently
 try:
@@ -557,7 +558,7 @@ class EnemyInit(Image, GlobalContainer):
     return False
 
 def initGame(self):
-  # two images for the effect of a 'moving background'
+  # two images for the effect of a 'vertically moving background'
   self.spacebg = Rectangle(pos=(0, 0),
     size=(Window.width, Window.height), source='images/spacebg.png')
   self.spacebg2 = Rectangle(pos=(0, Window.height),
@@ -590,13 +591,14 @@ def initGame(self):
   self.toggle = True
   self.next = 0
 
-  sched_append(lambda x: print(GlobalContainer.anc.children), 1)
+  #sched_append(lambda x: print(GlobalContainer.anc.children), 1)
 
   # do not allow ESC press during Game Over screen
   self.isDuringGO = False
   GlobalContainer.anc = self
   sched_append(lambda x: self.add_widget(RandomDrop(self)), 7)
-  Window.bind(on_touch_down=lambda x, p: clickAbout(p, self))
+  Window.bind(on_touch_down = lambda x, p: clickAbout(p, self))
+  Window.bind(on_resize = self.resizeBackground)
 
 # initialize spaceship, enemies etc.
 class MainLayout(Widget, GlobalContainer):
@@ -649,6 +651,10 @@ class MainLayout(Widget, GlobalContainer):
     enemy = EnemyInit(self)
     self.add_widget(enemy)
     self.enemies.append(enemy)
+  
+  # update the size of the background while resizing the window
+  def resizeBackground(self, instance, x, y):
+    self.spacebg.size = self.spacebg2.size = (Window.width, Window.height)
           
 class SpaceApp(App):
   def build(self):
